@@ -47,3 +47,13 @@ PAINTSTRUCT STRUCT
     fIncUpdate      DWORD   ?
     rgbReserved     BYTE    32 DUP(?)
 PAINTSTRUCT ENDS
+
+; 讓所有引入此檔案的模組都能「看見」這些變數
+EXTERN Key_Up:      BYTE
+EXTERN Key_Down:    BYTE
+EXTERN Key_Left:    BYTE
+EXTERN Key_Right:   BYTE
+EXTERN Key_Space:   BYTE
+
+; 宣告函式
+EXTERN UpdateInput: PROC
