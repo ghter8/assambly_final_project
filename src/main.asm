@@ -38,10 +38,10 @@ MsgLoop:
     cmp     eax, 0
     jle     ExitApp
 
+    call    UpdateInput
+
     cmp     Key_Escape, 1
     je      ExitApp
-
-    call    UpdateInput
 
     lea     rcx, msg
     call    TranslateMessage
