@@ -1,5 +1,4 @@
-; file: src/main.asm
-; 主程式入口
+TITLE   主程式入口  ; file: src/main.asm
 
 INCLUDE common.inc  ; 引入結構
 

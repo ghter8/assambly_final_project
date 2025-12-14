@@ -1,5 +1,4 @@
-; file: src/window.asm
-; 視窗管理模組
+TITLE  視窗管理模組 ; file: src/window.asm
 
 INCLUDE common.inc  ; 引入結構定義
 
