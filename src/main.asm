@@ -12,10 +12,12 @@ EXTERN InitWindow: PROC
 
 PUBLIC gaming
 
+.data
+    gaming  BYTE    0
+
 .data?
     msg     WinMsg  <>
 
-    gaming  BYTE    0
 .code
 main_asm PROC
     sub     rsp, 40
@@ -42,6 +44,9 @@ MsgLoop:
 
     cmp     Key_Escape, 1
     je      ExitApp
+
+    cmp     Key_Z, 1
+    mov     gaming, 1
 
     lea     rcx, msg
     call    TranslateMessage

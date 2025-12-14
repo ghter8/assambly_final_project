@@ -45,7 +45,11 @@ SRCCOPY         EQU 00CC0020h
     WindowName      DW 'M', 'A', 'S', 'M', ' ', 'D', 'e', 'b', 'u', 'g', 0
     
     ; 請確認檔名正確
-    BitmapFileName  DW 'r', 'e', 's', 'o', 'u', 'r', 'c', 'e', 's', '\', 's', 'o', 'u', 'l', '_', 'r', 'e', 'd', '.', 'b', 'm', 'p', 0
+    BitmapFileName      DW 'r', 'e', 's', 'o', 'u', 'r', 'c', 'e', 's', '\', 's', 'o', 'u', 'l', '_', 'r', 'e', 'd', '.', 'b', 'm', 'p', 0
+    BitmapFileName_bd   DW 'r', 'e', 's', 'o', 'u', 'r', 'c', 'e', 's', '\', 's', 'o', 'u', 'l', '_', 'b', 'l', 'u', 'e', '_', 'd', 'o', 'w', 'n', '.', 'b', 'm', 'p', 0
+    BitmapFileName_bu   DW 'r', 'e', 's', 'o', 'u', 'r', 'c', 'e', 's', '\', 's', 'o', 'u', 'l', '_', 'b', 'l', 'u', 'e', '_', 'u', 'p', '.', 'b', 'm', 'p', 0
+    BitmapFileName_bl   DW 'r', 'e', 's', 'o', 'u', 'r', 'c', 'e', 's', '\', 's', 'o', 'u', 'l', '_', 'b', 'l', 'u', 'e', '_', 'l', 'e', 'f', 't', '.', 'b', 'm', 'p', 0
+    BitmapFileName_br   DW 'r', 'e', 's', 'o', 'u', 'r', 'c', 'e', 's', '\', 's', 'o', 'u', 'l', '_', 'b', 'l', 'u', 'e', '_', 'r', 'i', 'g', 'h', 't', '.', 'b', 'm', 'p', 0
 
     ErrTitle        DW 'D', 'e', 'b', 'u', 'g', 0
     ErrLoadImg      DW 'L', 'o', 'a', 'd', 'I', 'm', 'a', 'g', 'e', ' ', 'F', 'a', 'i', 'l', 'e', 'd', 0
@@ -56,6 +60,10 @@ SRCCOPY         EQU 00CC0020h
     hInstance       QWORD   0
     hWnd            QWORD   0
     hBitmap         QWORD   0
+    hBitmap_bd      QWORD   0
+    hBitmap_bu      QWORD   0
+    hBitmap_bl      QWORD   0
+    hBitmap_br      QWORD   0
     bmWidth         DWORD   0
     bmHeight        DWORD   0
 
@@ -90,15 +98,7 @@ InitWindow PROC
     mov     [hInstance], rax
 
     ; 2. LoadImageW
-    mov     rcx, 0
-    lea     rdx, BitmapFileName
-    mov     r8, IMAGE_BITMAP
-    mov     r9, 0
-    mov     qword ptr [rsp+32], 0
-    mov     qword ptr [rsp+40], 10h
-    call    LoadImageW
-    
-    mov     [hBitmap], rax
+    call    InitPictures
 
     ; 檢查載入結果
     cmp     rax, 0
@@ -333,5 +333,57 @@ FinishWndProc:
     pop     rbx
     ret
 WndProc ENDP
+
+InitPictures PROC
+    mov     rcx, 0
+    lea     rdx, BitmapFileName
+    mov     r8, IMAGE_BITMAP
+    mov     r9, 0
+    mov     qword ptr [rsp+32], 0
+    mov     qword ptr [rsp+40], 10h
+    call    LoadImageW
+    
+    mov     [hBitmap], rax
+    
+    mov     rcx, 0
+    lea     rdx, BitmapFileName_bd
+    mov     r8, IMAGE_BITMAP
+    mov     r9, 0
+    mov     qword ptr [rsp+32], 0
+    mov     qword ptr [rsp+40], 10h
+    call    LoadImageW
+    
+    mov     [hBitmap_bd], rax
+    
+    mov     rcx, 0
+    lea     rdx, BitmapFileName_bu
+    mov     r8, IMAGE_BITMAP
+    mov     r9, 0
+    mov     qword ptr [rsp+32], 0
+    mov     qword ptr [rsp+40], 10h
+    call    LoadImageW
+    
+    mov     [hBitmap_bu], rax
+    
+    mov     rcx, 0
+    lea     rdx, BitmapFileName_bl
+    mov     r8, IMAGE_BITMAP
+    mov     r9, 0
+    mov     qword ptr [rsp+32], 0
+    mov     qword ptr [rsp+40], 10h
+    call    LoadImageW
+    
+    mov     [hBitmap_bl], rax
+    
+    mov     rcx, 0
+    lea     rdx, BitmapFileName_br
+    mov     r8, IMAGE_BITMAP
+    mov     r9, 0
+    mov     qword ptr [rsp+32], 0
+    mov     qword ptr [rsp+40], 10h
+    call    LoadImageW
+    
+    mov     [hBitmap_br], rax
+InitPictures ENDP
 
 END
