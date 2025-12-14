@@ -335,6 +335,7 @@ FinishWndProc:
 WndProc ENDP
 
 InitPictures PROC
+    sub     rsp, 56         ; Shadow Space
     mov     rcx, 0
     lea     rdx, BitmapFileName
     mov     r8, IMAGE_BITMAP
@@ -384,6 +385,8 @@ InitPictures PROC
     call    LoadImageW
     
     mov     [hBitmap_br], rax
+    add     rsp, 56
+    ret
 InitPictures ENDP
 
 END
