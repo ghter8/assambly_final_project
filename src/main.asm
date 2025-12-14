@@ -7,10 +7,7 @@ EXTERN GetMessageW: PROC
 EXTERN TranslateMessage: PROC
 EXTERN DispatchMessageW: PROC
 
-; --- 引入我們在 window.asm 寫的函式 ---
-EXTERN InitWindow: PROC
-EXTERN Movement: PROC
-
+; --- 公開變數 ---
 PUBLIC gaming
 
 .data

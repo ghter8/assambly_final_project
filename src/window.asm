@@ -1,7 +1,7 @@
 ; file: src/window.asm
 ; 顯示 BMP 圖片 (Debug Mode + Register Safety)
 
-__WINDOW_ASM__ EQU 1
+IS_WINDOW_MODULE EQU 1
 INCLUDE common.inc
 
 ; ==========================================================
