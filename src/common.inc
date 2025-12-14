@@ -68,4 +68,6 @@ ENDIF
 
 IFNDEF IS_GAME_MODULE
     EXTERN Movement:    PROC
+    EXTERN PlayerX:     SDWORD
+    EXTERN PlayerY:     SDWORD
 ENDIF
