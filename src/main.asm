@@ -9,6 +9,7 @@ EXTERN DispatchMessageW: PROC
 
 ; --- 引入我們在 window.asm 寫的函式 ---
 EXTERN InitWindow: PROC
+EXTERN Movement: PROC
 
 PUBLIC gaming
 
@@ -44,6 +45,8 @@ MsgLoop:
 
     cmp     Key_Escape, 1
     je      ExitApp
+
+    call    Movement
 
     cmp     Key_Z, 1
     mov     gaming, 1

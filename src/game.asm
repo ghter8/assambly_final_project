@@ -5,12 +5,17 @@ IS_GAME_MODULE EQU 1
 INCLUDE common.inc
 
 PUBLIC Status
+PUBLIC PlayerX
+PUBLIC PlayerY
+PUBLIC HP
+PUBLIC KR
+PUBLIC Movement
 
 .data
 
     ; 遊戲相關變數
-    PlayerX     DWORD   100
-    PlayerY     DWORD   100
+    PlayerX     WORD   100
+    PlayerY     WORD   100
     Status      BYTE    0
     HP          BYTE    92
     KR          BYTE    0
@@ -55,13 +60,13 @@ MoveDown:
 blue:
 EndMovement:
     ; 更新玩家位置
-    mov     eax, PlayerX
-    add     eax, xSpeed
-    mov     PlayerX, eax
+    mov     ax, PlayerX
+    add     ax, xSpeed
+    mov     PlayerX, ax
 
-    mov     eax, PlayerY
-    add     eax, ySpeed
-    mov     PlayerY, eax
+    mov     ax, PlayerY
+    add     ax, ySpeed
+    mov     PlayerY, ax
 
     ret
 
