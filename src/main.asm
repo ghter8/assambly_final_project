@@ -10,9 +10,12 @@ EXTERN DispatchMessageW: PROC
 ; --- 引入我們在 window.asm 寫的函式 ---
 EXTERN InitWindow: PROC
 
-.data?
-    msg     WinMsg      <>
+PUBLIC gaming
 
+.data?
+    msg     WinMsg  <>
+
+    gaming  BYTE    0
 .code
 main_asm PROC
     sub     rsp, 40
@@ -34,6 +37,11 @@ MsgLoop:
     
     cmp     eax, 0
     jle     ExitApp
+
+    cmp     Key_Escape, 1
+    je      ExitApp
+
+    call    UpdateInput
 
     lea     rcx, msg
     call    TranslateMessage

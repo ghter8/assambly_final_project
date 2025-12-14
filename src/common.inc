@@ -59,4 +59,5 @@ IFNDEF IS_INPUT_MODULE
     EXTERN Key_Left:    BYTE
     EXTERN Key_Right:   BYTE
     EXTERN Key_Z:       BYTE
+    EXTERN Key_Escape:  BYTE
 ENDIF

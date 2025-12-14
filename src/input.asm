@@ -11,7 +11,7 @@ EXTERN GetAsyncKeyState: PROC
 
 ; --- 公開變數與函式 ---
 PUBLIC UpdateInput
-PUBLIC Key_Up, Key_Down, Key_Left, Key_Right, Key_Z
+PUBLIC Key_Up, Key_Down, Key_Left, Key_Right, Key_Z, Key_Escape
 
 .data
     ; 定義 5 個按鍵的狀態 (0 = 放開, 1 = 按下)
@@ -20,6 +20,7 @@ PUBLIC Key_Up, Key_Down, Key_Left, Key_Right, Key_Z
     Key_Left    BYTE    0
     Key_Right   BYTE    0
     Key_Z       BYTE    0
+    Key_Escape     BYTE    0
 
 .code
 
@@ -60,6 +61,12 @@ UpdateInput PROC
     call    GetAsyncKeyState
     test    ax, 8000h
     setnz   [Key_Z]
+
+    ; --- 6. 檢查 ESCAPE (VK_ESCAPE = 0x1B) ---
+    mov     rcx, 1Bh
+    call    GetAsyncKeyState
+    test    ax, 8000h
+    setnz   [Key_Escape]
 
     add     rsp, 40
     ret
