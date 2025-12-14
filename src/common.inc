@@ -48,12 +48,15 @@ PAINTSTRUCT STRUCT
     rgbReserved     BYTE    32 DUP(?)
 PAINTSTRUCT ENDS
 
-; 讓所有引入此檔案的模組都能「看見」這些變數
-EXTERN Key_Up:      BYTE
-EXTERN Key_Down:    BYTE
-EXTERN Key_Left:    BYTE
-EXTERN Key_Right:   BYTE
-EXTERN Key_Space:   BYTE
-
-; 宣告函式
-EXTERN UpdateInput: PROC
+; ==========================================
+; 輸入模組宣告
+; 邏輯：如果 "不是" Input 模組在讀我，我就告訴他這些是 EXTERN
+; ==========================================
+IFNDEF IS_INPUT_MODULE
+    EXTERN UpdateInput: PROC
+    EXTERN Key_Up:      BYTE
+    EXTERN Key_Down:    BYTE
+    EXTERN Key_Left:    BYTE
+    EXTERN Key_Right:   BYTE
+    EXTERN Key_Z:       BYTE
+ENDIF

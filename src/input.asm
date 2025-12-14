@@ -1,6 +1,9 @@
 ; file: src/input.asm
 ; 輸入系統 (使用 GetAsyncKeyState 進行輪詢)
 
+; 【新增】定義一個旗標，告訴 common.inc 不要宣告 input 的 EXTERN
+IS_INPUT_MODULE EQU 1
+
 INCLUDE common.inc
 
 ; --- 引入 Windows API ---
@@ -16,7 +19,7 @@ PUBLIC Key_Up, Key_Down, Key_Left, Key_Right, Key_Z
     Key_Down    BYTE    0
     Key_Left    BYTE    0
     Key_Right   BYTE    0
-    Key_Z   BYTE    0
+    Key_Z       BYTE    0
 
 .code
 
