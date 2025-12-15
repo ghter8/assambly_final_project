@@ -8,6 +8,7 @@ PUBLIC PlayerX, PlayerY
 PUBLIC GameState, Score
 PUBLIC Obstacles
 PUBLIC UpdateGame
+PUBLIC DinoFrame
 
 ; 遊戲常數
 GROUND_Y        EQU 400     ; 地板高度 (Y座標)
@@ -35,6 +36,11 @@ STATE_GAMEOVER  EQU 1
     
     SpawnTimer  DWORD   0       ; 生成計時器
 
+    ; [新增] 動畫相關變數
+    DinoFrame   DWORD   0       ; 目前是第幾張圖 (0或1)
+    AnimTimer   DWORD   0       ; 動畫計時器
+    ANIM_SPEED  EQU     10      ; 每 10 幀換一次圖 (數字越大跑越慢)
+
 .code
 
 ; ==========================================================
@@ -53,6 +59,9 @@ UpdateGame PROC
 
     ; 3. 碰撞檢測
     call    CheckCollision
+
+    ; [新增] 更新恐龍動畫
+    call    UpdateAnimation
 
     ; 4. 分數增加
     inc     Score
@@ -224,6 +233,32 @@ NextCol:
     jl      ColLoop
     ret
 CheckCollision ENDP
+
+; ==========================================================
+; [新增] UpdateAnimation: 控制跑步動作
+; ==========================================================
+UpdateAnimation PROC
+    ; 1. 如果在跳躍中，固定顯示第 0 張 (或是您可以設成第 1 張當作跳躍姿勢)
+    cmp     IsJumping, 1
+    je      SetJumpFrame
+
+    ; 2. 跑步動畫：計時器累加
+    inc     AnimTimer
+    cmp     AnimTimer, ANIM_SPEED
+    jl      EndAnim
+
+    ; 3. 時間到，切換 Frame (0 -> 1, 1 -> 0)
+    mov     AnimTimer, 0
+    xor     DinoFrame, 1        ; XOR 1 可以讓 0變1, 1變0
+    jmp     EndAnim
+
+SetJumpFrame:
+    mov     DinoFrame, 0        ; 跳躍時固定姿勢
+    mov     AnimTimer, 0        ; 重置計時
+
+EndAnim:
+    ret
+UpdateAnimation ENDP
 
 ; ==========================================================
 ; ResetGame: 重置所有變數

@@ -76,10 +76,13 @@ IFNDEF IS_WINDOW_MODULE
 ENDIF
 
 IFNDEF IS_GAME_MODULE
-    EXTERN UpdateGame:  PROC ; 改名為 UpdateGame 更貼切
+    EXTERN UpdateGame:  PROC
     EXTERN PlayerX:     SDWORD
     EXTERN PlayerY:     SDWORD
     EXTERN GameState:   DWORD
     EXTERN Score:       DWORD
     EXTERN Obstacles:   GameObject
+    
+    ; [新增] 恐龍動畫幀數 (0 或 1)
+    EXTERN DinoFrame:   DWORD
 ENDIF
