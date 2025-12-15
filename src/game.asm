@@ -1,268 +1,250 @@
-
+; file: src/game.asm
+; 恐龍遊戲邏輯核心
 
 IS_GAME_MODULE EQU 1
-
 INCLUDE common.inc
 
-PUBLIC Status
-PUBLIC PlayerX
-PUBLIC PlayerY
-PUBLIC HP
-PUBLIC KR
-PUBLIC Movement
+PUBLIC PlayerX, PlayerY
+PUBLIC GameState, Score
+PUBLIC Obstacles
+PUBLIC UpdateGame
 
-PUBLIC ObjectPool
-PUBLIC SpawnObject
-PUBLIC UpdateObjects
+; 遊戲常數
+GROUND_Y        EQU 400     ; 地板高度 (Y座標)
+GRAVITY         EQU 1       ; 重力加速度
+JUMP_FORCE      EQU -15     ; 跳躍初速度 (負值往上)
+GAME_SPEED      EQU 8       ; 障礙物移動速度
+SPAWN_RATE      EQU 60      ; 障礙物生成頻率 (約每 60 幀一次)
+
+; 狀態常數
+STATE_PLAYING   EQU 0
+STATE_GAMEOVER  EQU 1
 
 .data
+    PlayerX     SDWORD  100     ; 恐龍固定在左側
+    PlayerY     SDWORD  GROUND_Y
+    
+    VelocityY   SDWORD  0       ; Y 軸速度
+    IsJumping   BYTE    0       ; 是否在空中
 
-    ; 遊戲相關變數
-    PlayerX     SDWORD   400
-    PlayerY     SDWORD   300
-    Status      BYTE    0
-    HP          BYTE    92
-    KR          BYTE    92
-    xSpeed      SDWORD   0
-    ySpeed      SDWORD   0
-    Jumping     BYTE    0
-    Falling     BYTE    0
-    TopBound    SDWORD    200
-    BottomBound SDWORD    400
-    RightBound  SDWORD    300
-    LeftBound   SDWORD    500
-
-    ; --- 物件池 (陣列) ---
-    ; 宣告 10 個 GameObject，記憶體連續排列
-    ObjectPool  GameObject MAX_OBJECTS DUP(<>)
-
-    ; 參數設定
-    FadeSpeed   DWORD   35       ; 淡入淡出速度
-    StayTime    DWORD   50      ; 物件完全顯示後停留多久 (幀數)
+    GameState   DWORD   STATE_PLAYING
+    Score       DWORD   0
+    
+    ; 障礙物池
+    Obstacles   GameObject MAX_OBSTACLES DUP(<>)
+    
+    SpawnTimer  DWORD   0       ; 生成計時器
 
 .code
 
-Movement PROC
-    ; 根據按鍵狀態更新玩家位置
-    cmp     Status, 0
-    jne     blue
+; ==========================================================
+; UpdateGame: 主遊戲迴圈
+; ==========================================================
+UpdateGame PROC
+    ; 如果遊戲結束，就不更新邏輯 (按下 Space 重來)
+    cmp     GameState, STATE_GAMEOVER
+    je      CheckRestart
 
-    mov     xSpeed, 0
-    mov     ySpeed, 0
+    ; 1. 玩家物理運算 (重力與跳躍)
+    call    UpdatePhysics
 
-    cmp     Key_Left, 1
-    jne     MoveLeft
-    sub     xSpeed, 3
-MoveLeft:
-    cmp     Key_Right, 1
-    jne     MoveRight
-    add     xSpeed, 3
-MoveRight:
-    cmp     Key_Up, 1
-    jne     MoveUp
-    sub     ySpeed, 3
-MoveUp:
-    cmp     Key_Down, 1
-    jne     MoveDown
-    add     ySpeed, 3
-MoveDown:
-    jmp     EndMovement
+    ; 2. 障礙物管理 (移動與生成)
+    call    UpdateObstacles
 
-blue:
-    cmp     Key_Left, 1
-    jne     bMoveLeft
-    sub     xSpeed, 3
-bMoveLeft:
-    cmp     Key_Right, 1
-    jne     bMoveRight
-    add     xSpeed, 3
-bMoveRight:
-    cmp     Key_Up, 1
-    jne     EndMovement
-    mov     eax, PlayerY
-    cmp     eax, bottomBound
-    jne     MoveNoJump
-    mov     ySpeed, -3
-    mov     Jumping, 1
-MoveNoJump:
+    ; 3. 碰撞檢測
+    call    CheckCollision
 
-EndMovement:
-    ; 更新玩家位置
-    mov     eax, PlayerX
-    add     eax, xSpeed
-    mov     PlayerX, eax
-
-    mov     eax, PlayerY
-    add     eax, ySpeed
-    mov     PlayerY, eax
-
-    mov     eax, PlayerY
-    cmp     eax, topBound
-    jg      noTopBound
-    mov     eax, topBound
-noTopBound:
-    cmp     eax, bottomBound
-    jl      noBottomBound
-    mov     eax, bottomBound
-noBottomBound:
-    mov     PlayerY, eax
-    mov     eax, PlayerX
-    cmp     eax, leftBound
-    jl      noLeftBound
-    mov     eax, leftBound
-noLeftBound:
-    cmp     eax, rightBound
-    jg      noRightBound
-    mov     eax, rightBound
-noRightBound:
-    mov     PlayerX, eax
-
+    ; 4. 分數增加
+    inc     Score
     ret
 
-Movement ENDP
+CheckRestart:
+    ; 遊戲結束狀態：按 Space 重置遊戲
+    cmp     Key_Space, 1
+    je      ResetGame
+    ret
 
-setRed PROC
-    mov     Status, 0
-    mov     Falling, 0
-    mov     Jumping, 0
-setRed ENDP
+UpdateGame ENDP
 
-Throw PROC
-    mov     Status, al
-    mov     Falling, ah
-    mov     ySpeed, 30
-Throw ENDP
+; ==========================================================
+; UpdatePhysics: 處理跳躍與重力
+; ==========================================================
+UpdatePhysics PROC
+    ; --- 施加重力 ---
+    mov     eax, VelocityY
+    add     eax, GRAVITY
+    mov     VelocityY, eax
 
-; ==========================================
-; SpawnObject
-; 功能：在指定位置產生一個淡入物件
-; 參數：ECX = X, EDX = Y, R8D = DirX, R9D = DirY
-; ==========================================
-SpawnObject PROC
-    ; 保存暫存器 (因為我們會用到迴圈)
-    push    rbx
-    push    rsi
+    ; --- 更新 Y 座標 ---
+    mov     eax, PlayerY
+    add     eax, VelocityY
+    mov     PlayerY, eax
 
-    ; 初始化迴圈
-    mov     rsi, 0                  ; 索引 Index
-    lea     rbx, ObjectPool         ; RBX 指向陣列開頭
-
-FindSlotLoop:
-    ; 檢查這個位置是否是「死掉」的物件
-    cmp     [rbx].GameObject.state, OBJ_DEAD
-    je      FoundSlot               ; 找到空位了！
-
-    ; 下一個
-    add     rbx, SIZEOF GameObject  ; 移動指標到下一個物件
-    inc     rsi
-    cmp     rsi, MAX_OBJECTS
-    jl      FindSlotLoop
+    ; --- 地板碰撞檢測 ---
+    cmp     PlayerY, GROUND_Y
+    jl      CheckJumpInput      ; 如果在空中 (Y < Ground)，檢查是否要跳 (二段跳? 這裡先不做)
     
-    ; 如果找完一圈都沒空位，就直接放棄不生成
-    jmp     SpawnEnd
+    ; 著地處理
+    mov     PlayerY, GROUND_Y
+    mov     VelocityY, 0
+    mov     IsJumping, 0
+
+    ; --- 跳躍輸入檢測 (只有在地板上才能跳) ---
+    cmp     Key_Space, 1        ; 檢查 Space
+    je      DoJump
+    cmp     Key_Up, 1           ; 或是 Up 也可以跳
+    je      DoJump
+    jmp     EndPhysics
+
+DoJump:
+    mov     VelocityY, JUMP_FORCE
+    mov     IsJumping, 1
+
+EndPhysics:
+    ret
+CheckJumpInput:
+    ret
+UpdatePhysics ENDP
+
+; ==========================================================
+; UpdateObstacles: 障礙物移動與生成
+; ==========================================================
+UpdateObstacles PROC
+    ; --- 1. 移動現有障礙物 ---
+    mov     r10, 0              ; Loop index
+    lea     rbx, Obstacles      ; 指向陣列
+
+MoveLoop:
+    cmp     [rbx].GameObject.active, 1
+    jne     NextObs
+
+    ; X -= Speed
+    mov     eax, [rbx].GameObject.x
+    sub     eax, GAME_SPEED
+    mov     [rbx].GameObject.x, eax
+
+    ; 檢查是否超出左邊界 (回收)
+    cmp     eax, -50
+    jg      NextObs
+    mov     [rbx].GameObject.active, 0  ; 關閉
+
+NextObs:
+    add     rbx, SIZEOF GameObject
+    inc     r10
+    cmp     r10, MAX_OBSTACLES
+    jl      MoveLoop
+
+    ; --- 2. 生成新障礙物 ---
+    inc     SpawnTimer
+    cmp     SpawnTimer, SPAWN_RATE
+    jl      EndObs
+    
+    ; 重置計時器 (可以加入隨機性讓遊戲更有趣，這裡先固定)
+    mov     SpawnTimer, 0
+    call    SpawnObstacle
+
+EndObs:
+    ret
+UpdateObstacles ENDP
+
+; ==========================================================
+; SpawnObstacle: 找一個空位生成障礙物
+; ==========================================================
+SpawnObstacle PROC
+    mov     r10, 0
+    lea     rbx, Obstacles
+
+FindSlot:
+    cmp     [rbx].GameObject.active, 0
+    je      FoundSlot
+    
+    add     rbx, SIZEOF GameObject
+    inc     r10
+    cmp     r10, MAX_OBSTACLES
+    jl      FindSlot
+    ret ; 沒空位就不生了
 
 FoundSlot:
-    ; 重置物件狀態
-    mov     [rbx].GameObject.state, OBJ_FADE_IN
-    mov     [rbx].GameObject.x, ecx
-    mov     [rbx].GameObject.y, edx
-    mov     [rbx].GameObject.dirX, r8d
-    mov     [rbx].GameObject.dirY, r9d
-    mov     [rbx].GameObject.alpha, 0       ; 初始透明度 0
-    mov     [rbx].GameObject.lifeTime, 0
-
-SpawnEnd:
-    pop     rsi
-    pop     rbx
+    mov     [rbx].GameObject.active, 1
+    mov     [rbx].GameObject.x, 800     ; 從螢幕最右邊出現
+    mov     [rbx].GameObject.y, 420     ; 障礙物高度 (比地板低一點，因為圖片原點在左上)
+    mov     [rbx].GameObject.w, 40      ; 碰撞箱寬
+    mov     [rbx].GameObject.h, 40      ; 碰撞箱高
     ret
-SpawnObject ENDP
+SpawnObstacle ENDP
 
-; ==========================================
-; UpdateObjects
-; 功能：更新所有存活物件的狀態 (移動、淡入淡出)
-; ==========================================
-UpdateObjects PROC
-    push    rbx
-    push    rsi
-
-    mov     rsi, 0
-    lea     rbx, ObjectPool
-
-UpdateLoop:
-    ; 如果是死的，跳過
-    cmp     [rbx].GameObject.state, OBJ_DEAD
-    je      NextObj
-
-    ; 1. 更新位置 (X += dirX, Y += dirY)
-    mov     eax, [rbx].GameObject.dirX
-    add     [rbx].GameObject.x, eax
-    mov     eax, [rbx].GameObject.dirY
-    add     [rbx].GameObject.y, eax
-
-    ; 2. 狀態機處理
-    mov     eax, [rbx].GameObject.state
+; ==========================================================
+; CheckCollision: 簡單矩形碰撞 (AABB)
+; ==========================================================
+CheckCollision PROC
+    ; 玩家碰撞箱 (假設 40x40)
+    ; Player Box: x1=PlayerX, x2=PlayerX+40, y1=PlayerY, y2=PlayerY+40
     
-    cmp     eax, OBJ_FADE_IN
-    je      DoFadeIn
-    cmp     eax, OBJ_ACTIVE
-    je      DoActive
-    cmp     eax, OBJ_FADE_OUT
-    je      DoFadeOut
-    jmp     NextObj
+    mov     r10, 0
+    lea     rbx, Obstacles
 
-DoFadeIn:
-    ; 透明度增加
-    mov     eax, [rbx].GameObject.alpha
-    add     eax, [FadeSpeed]
-    cmp     eax, 255
-    jl      SaveAlphaIn
+ColLoop:
+    cmp     [rbx].GameObject.active, 1
+    jne     NextCol
+
+    ; 檢查 X 軸重疊
+    ; if (PlayerRight > ObsLeft && PlayerLeft < ObsRight)
+    mov     eax, PlayerX
+    add     eax, 40             ; PlayerRight
+    cmp     eax, [rbx].GameObject.x
+    jle     NextCol             ; 沒撞到 (玩家在障礙物左邊)
+
+    mov     eax, [rbx].GameObject.x
+    add     eax, [rbx].GameObject.w ; ObsRight
+    cmp     PlayerX, eax
+    jge     NextCol             ; 沒撞到 (玩家在障礙物右邊)
+
+    ; 檢查 Y 軸重疊
+    ; if (PlayerBottom > ObsTop && PlayerTop < ObsBottom)
+    mov     eax, PlayerY
+    add     eax, 40             ; PlayerBottom
+    cmp     eax, [rbx].GameObject.y
+    jle     NextCol             ; 沒撞到 (玩家在障礙物上面)
     
-    ; 淡入完成 -> 轉為 ACTIVE
-    mov     eax, 255
-    mov     [rbx].GameObject.state, OBJ_ACTIVE
-    
-    ; 設定停留時間
-    mov     ecx, [StayTime]
-    mov     [rbx].GameObject.lifeTime, ecx
+    ; 這裡簡化：只要 X 重疊且玩家不夠高 (Y > ObsY - PlayerH) 就算撞到
+    ; 實際上只要檢測玩家是否跳過障礙物
+    mov     eax, [rbx].GameObject.y
+    add     eax, [rbx].GameObject.h
+    cmp     PlayerY, eax
+    jge     NextCol             ; 沒撞到 (玩家在障礙物下面?? 不太可能)
 
-SaveAlphaIn:
-    mov     [rbx].GameObject.alpha, eax
-    jmp     NextObj
+    ; --- 撞到了！ ---
+    mov     GameState, STATE_GAMEOVER
+    ret
 
-DoActive:
-    ; 倒數計時
-    dec     [rbx].GameObject.lifeTime
-    cmp     [rbx].GameObject.lifeTime, 0
-    jg      NextObj
-    
-    ; 時間到 -> 轉為 FADE_OUT
-    mov     [rbx].GameObject.state, OBJ_FADE_OUT
-    jmp     NextObj
-
-DoFadeOut:
-    ; 透明度減少
-    mov     eax, [rbx].GameObject.alpha
-    sub     eax, [FadeSpeed]
-    cmp     eax, 0
-    jg      SaveAlphaOut
-    
-    ; 淡出完成 -> 死亡 (釋放位置)
-    mov     eax, 0
-    mov     [rbx].GameObject.state, OBJ_DEAD
-
-SaveAlphaOut:
-    mov     [rbx].GameObject.alpha, eax
-    jmp     NextObj
-
-NextObj:
+NextCol:
     add     rbx, SIZEOF GameObject
-    inc     rsi
-    cmp     rsi, MAX_OBJECTS
-    jl      UpdateLoop
-
-    pop     rsi
-    pop     rbx
+    inc     r10
+    cmp     r10, MAX_OBSTACLES
+    jl      ColLoop
     ret
-UpdateObjects ENDP
+CheckCollision ENDP
+
+; ==========================================================
+; ResetGame: 重置所有變數
+; ==========================================================
+ResetGame PROC
+    mov     PlayerY, GROUND_Y
+    mov     VelocityY, 0
+    mov     Score, 0
+    mov     SpawnTimer, 0
+    mov     GameState, STATE_PLAYING
+
+    ; 清空所有障礙物
+    mov     r10, 0
+    lea     rbx, Obstacles
+ClearLoop:
+    mov     [rbx].GameObject.active, 0
+    add     rbx, SIZEOF GameObject
+    inc     r10
+    cmp     r10, MAX_OBSTACLES
+    jl      ClearLoop
+    ret
+ResetGame ENDP
 
 END

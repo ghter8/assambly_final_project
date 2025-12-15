@@ -38,34 +38,15 @@ MsgLoop:
     cmp     eax, 0
     jle     ExitApp
 
-    ; ... (檢查 Timer 訊息) ...
     cmp     msg.message, 0113h
     jne     SkipGameLogic
 
     call    UpdateInput
-    
-    ; 1. 玩家移動
-    call    Movement
+    cmp     Key_Escape, 1
+    je      ExitApp
 
-    ; 2. [新增] 更新特效物件狀態
-    call    UpdateObjects
-
-    ; 3. [新增] 測試生成：按下 Z 鍵時產生特效
-    ; 我們在玩家當前位置生成一個物件，並讓它隨機或固定方向飄走
-    cmp     Key_Z, 1
-    jne     SkipSpawn
-    
-    ; 參數: X=PlayerX, Y=PlayerY, DirX=2, DirY=-2 (往右上方飛)
-    mov     ecx, [PlayerX]
-    mov     edx, [PlayerY]
-    mov     r8d, 2
-    mov     r9d, -2
-    call    SpawnObject
-    
-    ; (為了避免按住 Z 一次噴太多，您可以加一個冷卻機制，但暫時先這樣看效果)
-
-SkipSpawn:
-    ; --------------------------------------
+    ; [修正] 呼叫新的遊戲邏輯
+    call    UpdateGame
 
 SkipGameLogic:
     ; 3. 繼續原本的 Windows 訊息分派 (處理繪圖、視窗操作等)

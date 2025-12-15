@@ -1,12 +1,10 @@
 ; file: src/window.asm
-; 顯示 BMP 圖片 (修正背景清除與黑色背景)
+; 恐龍遊戲渲染模組
 
 IS_WINDOW_MODULE EQU 1
 INCLUDE common.inc
 
-; ==========================================================
-; API 宣告
-; ==========================================================
+; --- API 宣告 ---
 EXTERN GetModuleHandleW: PROC
 EXTERN LoadCursorW: PROC
 EXTERN RegisterClassExW: PROC
@@ -29,44 +27,28 @@ EXTERN BitBlt: PROC
 EXTERN DeleteDC: PROC
 EXTERN GetObjectW: PROC
 EXTERN MessageBoxW: PROC
-EXTERN AlphaBlend: PROC
 
 PUBLIC InitWindow
 PUBLIC WndProc
 
-; ==========================================================
-; 常數與資料
-; ==========================================================
+; 常數
 IMAGE_BITMAP    EQU 0
 LR_LOADFROMFILE EQU 10h
 SRCCOPY         EQU 00CC0020h
 
 .data
-    ClassName       DW 'M', 'y', 'G', 'a', 'm', 'e', 'C', 'l', 'a', 's', 's', 0
-    WindowName      DW 'M', 'A', 'S', 'M', ' ', 'G', 'a', 'm', 'e', 0
+    ClassName       DW 'D', 'i', 'n', 'o', 'G', 'a', 'm', 'e', 0
+    WindowName      DW 'M', 'A', 'S', 'M', ' ', 'D', 'i', 'n', 'o', 0
     
-    ; 圖片路徑 (保持不變)
-    BitmapFileName      DW 'r', 'e', 's', 'o', 'u', 'r', 'c', 'e', 's', '\', 's', 'o', 'u', 'l', '_', 'r', 'e', 'd', '.', 'b', 'm', 'p', 0
-    BitmapFileName_bd   DW 'r', 'e', 's', 'o', 'u', 'r', 'c', 'e', 's', '\', 's', 'o', 'u', 'l', '_', 'b', 'l', 'u', 'e', '_', 'd', 'o', 'w', 'n', '.', 'b', 'm', 'p', 0
-    BitmapFileName_bu   DW 'r', 'e', 's', 'o', 'u', 'r', 'c', 'e', 's', '\', 's', 'o', 'u', 'l', '_', 'b', 'l', 'u', 'e', '_', 'u', 'p', '.', 'b', 'm', 'p', 0
-    BitmapFileName_bl   DW 'r', 'e', 's', 'o', 'u', 'r', 'c', 'e', 's', '\', 's', 'o', 'u', 'l', '_', 'b', 'l', 'u', 'e', '_', 'l', 'e', 'f', 't', '.', 'b', 'm', 'p', 0
-    BitmapFileName_br   DW 'r', 'e', 's', 'o', 'u', 'r', 'c', 'e', 's', '\', 's', 'o', 'u', 'l', '_', 'b', 'l', 'u', 'e', '_', 'r', 'i', 'g', 'h', 't', '.', 'b', 'm', 'p', 0
-
-    ErrTitle        DW 'E', 'r', 'r', 'o', 'r', 0
-    ErrLoadImg      DW 'L', 'o', 'a', 'd', 'I', 'm', 'a', 'g', 'e', ' ', 'F', 'a', 'i', 'l', 'e', 'd', 0
-    ErrSize         DW 'I', 'm', 'a', 'g', 'e', ' ', 'S', 'i', 'z', 'e', ' ', 'i', 's', ' ', '0', 0
-    ErrRegister     DW 'R', 'e', 'g', 'i', 's', 't', 'e', 'r', ' ', 'E', 'r', 'r', 'o', 'r', 0
-    ErrCreate       DW 'C', 'r', 'e', 'a', 't', 'e', ' ', 'E', 'r', 'r', 'o', 'r', 0
+    ; 使用現有圖片：紅色當恐龍，藍色當障礙物
+    DinoImg         DW 'r', 'e', 's', 'o', 'u', 'r', 'c', 'e', 's', '\', 's', 'o', 'u', 'l', '_', 'r', 'e', 'd', '.', 'b', 'm', 'p', 0
+    ObsImg          DW 'r', 'e', 's', 'o', 'u', 'r', 'c', 'e', 's', '\', 's', 'o', 'u', 'l', '_', 'b', 'l', 'u', 'e', '_', 'l', 'e', 'f', 't', '.', 'b', 'm', 'p', 0
 
     hInstance       QWORD   0
     hWnd            QWORD   0
     
-    ; 圖片 Handle
-    hBitmap         QWORD   0
-    hBitmap_bd      QWORD   0
-    hBitmap_bu      QWORD   0
-    hBitmap_bl      QWORD   0
-    hBitmap_br      QWORD   0
+    hBitmapDino     QWORD   0
+    hBitmapObs      QWORD   0
     
     bmWidth         DWORD   0
     bmHeight        DWORD   0
@@ -89,51 +71,16 @@ SRCCOPY         EQU 00CC0020h
 
 .code
 
-; ==========================================================
-; InitWindow
-; ==========================================================
 InitWindow PROC
     sub     rsp, 104
-
-    ; 1. GetModuleHandle
     mov     rcx, 0
     call    GetModuleHandleW
     mov     [hInstance], rax
 
-    ; 2. 載入圖片
+    ; 載入圖片
     call    InitPictures
-    cmp     rax, 0
-    jne     GetImgInfo
 
-    mov     rcx, 0
-    lea     rdx, ErrLoadImg
-    lea     r8, ErrTitle
-    mov     r9, 10h
-    call    MessageBoxW
-    jmp     RegisterWin
-
-GetImgInfo:
-    mov     rcx, [hBitmap]
-    mov     rdx, SIZEOF BITMAP_STRUCT
-    lea     r8, bmInfo
-    call    GetObjectW
-    
-    mov     eax, bmInfo.bmWidth
-    mov     [bmWidth], eax
-    mov     eax, bmInfo.bmHeight
-    mov     [bmHeight], eax
-
-    cmp     eax, 0
-    jg      RegisterWin
-
-    mov     rcx, 0
-    lea     rdx, ErrSize
-    lea     r8, ErrTitle
-    mov     r9, 10h
-    call    MessageBoxW
-
-RegisterWin:
-    ; 3. Register Class
+    ; 註冊視窗
     mov     wc.cbSize, SIZEOF WNDCLASSEXW
     mov     wc.style, 3
     lea     rax, WndProc
@@ -143,14 +90,11 @@ RegisterWin:
     mov     rax, [hInstance]
     mov     wc.hInstance, rax
     mov     wc.hIcon, 0
-    
     mov     rcx, 0
     mov     rdx, 32512
     call    LoadCursorW
     mov     wc.hCursor, rax
-    
-    ; [修正] 將類別背景設為 NULL (0)，避免 Windows 自動清除造成閃爍
-    mov     wc.hbrBackground, 0 
+    mov     wc.hbrBackground, 0 ; 黑色背景
     mov     wc.lpszMenuName, 0
     lea     rax, ClassName
     mov     wc.lpszClassName, rax
@@ -159,10 +103,7 @@ RegisterWin:
     lea     rcx, wc
     call    RegisterClassExW
     
-    test    rax, rax
-    jz      FailRegister
-
-    ; 4. Create Window
+    ; 建立視窗
     mov     qword ptr [rsp+88], 0
     mov     rax, [hInstance]
     mov     qword ptr [rsp+80], rax
@@ -172,26 +113,20 @@ RegisterWin:
     mov     qword ptr [rsp+48], 800
     mov     qword ptr [rsp+40], 80000000h
     mov     qword ptr [rsp+32], 80000000h
-
     mov     r9d, 0CF0000h
     lea     r8, WindowName
     lea     rdx, ClassName
     mov     rcx, 0
     call    CreateWindowExW
-
     mov     [hWnd], rax
-    test    rax, rax
-    jz      FailCreate
 
-    ; 5. Show & Update
     mov     rcx, [hWnd]
     mov     rdx, 1
     call    ShowWindow
-
     mov     rcx, [hWnd]
     call    UpdateWindow
 
-    ; 6. Set Timer
+    ; Timer (10ms = 100 FPS)
     mov     rcx, [hWnd]
     mov     rdx, 1
     mov     r8, 10
@@ -201,47 +136,23 @@ RegisterWin:
     mov     rax, [hWnd]
     add     rsp, 104
     ret
-
-FailRegister:
-    mov     rcx, 0
-    lea     rdx, ErrRegister
-    lea     r8, ErrTitle
-    mov     r9, 10h
-    call    MessageBoxW
-    mov     rax, 0
-    add     rsp, 104
-    ret
-
-FailCreate:
-    mov     rcx, 0
-    lea     rdx, ErrCreate
-    lea     r8, ErrTitle
-    mov     r9, 10h
-    call    MessageBoxW
-    mov     rax, 0
-    add     rsp, 104
-    ret
 InitWindow ENDP
 
-; ==========================================================
-; WndProc
-; ==========================================================
 WndProc PROC
     push    rbx
     push    r12
     push    r13
     sub     rsp, 80
-
     mov     [rsp+80+32+8], rcx
     mov     [rsp+80+32+16], rdx
     mov     [rsp+80+32+24], r8
     mov     [rsp+80+32+32], r9
 
-    cmp     edx, 0002h      ; WM_DESTROY
+    cmp     edx, 0002h
     je      HandleDestroy
-    cmp     edx, 000Fh      ; WM_PAINT
+    cmp     edx, 000Fh
     je      HandlePaint
-    cmp     edx, 0113h      ; WM_TIMER
+    cmp     edx, 0113h
     je      HandleTimer
 
     mov     rcx, [rsp+80+32+8]
@@ -263,106 +174,103 @@ HandlePaint:
     mov     rcx, [rsp+80+32+8]
     lea     rdx, ps
     call    BeginPaint
-    mov     rbx, rax            ; RBX = hDestDC
+    mov     rbx, rax
 
-    ; ======================================================
-    ; [修正 1] 填滿黑色背景 (清除上一幀殘影)
-    ; ======================================================
-    mov     ecx, 0              ; 0 = 黑色
+    ; 1. 塗黑背景
+    mov     ecx, 0
     call    CreateSolidBrush
     mov     r12, rax
-    
-    ; [修正 2] 移除原本縮小的範圍，直接用 ps.rc (整個畫面)
     mov     rcx, rbx
     lea     rdx, ps.rc
     mov     r8, r12
     call    FillRect
-    
     mov     rcx, r12
     call    DeleteObject
-    ; ======================================================
 
-    ; 繪製圖片
-    cmp     [hBitmap], 0
-    je      EndPaintJob
+    ; 2. 畫地板 (白色線條)
+    ; 這裡簡單用白色矩形代替
+    mov     ecx, 0FFFFFFh
+    call    CreateSolidBrush
+    mov     r12, rax
+    
+    ; 設定地板矩形 (Left=0, Top=440, Right=800, Bottom=442)
+    mov     ps.rc.left, 0
+    mov     ps.rc.top, 440
+    mov     ps.rc.right, 800
+    mov     ps.rc.bottom, 442
+    
+    mov     rcx, rbx
+    lea     rdx, ps.rc
+    mov     r8, r12
+    call    FillRect
+    mov     rcx, r12
+    call    DeleteObject
+
+    ; 3. 畫恐龍
+    cmp     [hBitmapDino], 0
+    je      DrawObs
 
     mov     rcx, rbx
     call    CreateCompatibleDC
     mov     r13, rax
-
     mov     rcx, r13
-    mov     rdx, [hBitmap]
+    mov     rdx, [hBitmapDino]
     call    SelectObject
 
-    ; ==========================================================
-    ; [渲染] 繪製所有特效物件
-    ; ==========================================================
-    ; 使用 R15 作為迴圈計數器, R14 作為指標
-    mov     r15, 0
-    lea     r14, ObjectPool     ; 取得陣列開頭
-
-DrawObjectLoop:
-    ; 檢查物件是否存活 (非 DEAD)
-    cmp     [r14].GameObject.state, OBJ_DEAD
-    je      NextDrawObj
-
-    ; ------------------------------------------------------
-    ; 準備 AlphaBlend 參數
-    ; ------------------------------------------------------
-    
-    ; 1. 計算 BLENDFUNCTION (0x00AA0000)
-    mov     eax, [r14].GameObject.alpha
-    shl     eax, 16
-    mov     [rsp+80], rax       ; Param 11: BLENDFUNCTION
-
-    ; 2. 來源參數 (堆疊)
-    mov     eax, [bmHeight]
-    mov     [rsp+72], rax       ; Param 10: SrcH
-    mov     eax, [bmWidth]
-    mov     [rsp+64], rax       ; Param 9: SrcW
-    mov     qword ptr [rsp+56], 0 ; Param 8: SrcY
-    mov     qword ptr [rsp+48], 0 ; Param 7: SrcX
-    mov     qword ptr [rsp+40], r13 ; Param 6: hdcSrc
-
-    ; 3. 目標參數 (堆疊 + 暫存器)
-    mov     eax, [bmHeight]
-    mov     [rsp+32], rax       ; Param 5: DestH
-
-    mov     r9d, [bmWidth]      ; Param 4: DestW
-    
-    ; [關鍵] 使用物件自己的座標
-    mov     r8d, [r14].GameObject.y ; Param 3: DestY
-    mov     edx, [r14].GameObject.x ; Param 2: DestX
-    
-    mov     rcx, rbx            ; Param 1: hdcDest
-
-    ; 呼叫 AlphaBlend
-    call    AlphaBlend
-
-NextDrawObj:
-    add     r14, SIZEOF GameObject
-    inc     r15
-    cmp     r15, MAX_OBJECTS
-    jl      DrawObjectLoop
-
-    ; BitBlt
+    ; BitBlt 恐龍
     mov     qword ptr [rsp+64], SRCCOPY
     mov     qword ptr [rsp+56], 0
     mov     qword ptr [rsp+48], 0
     mov     qword ptr [rsp+40], r13
-    
-    mov     eax, [bmHeight]
-    mov     qword ptr [rsp+32], rax
-
-    mov     r9d, [bmWidth]
-    
-    ; [確保] 使用遊戲座標 (PlayerX, PlayerY)
-    mov     r8d, [PlayerY]
-    mov     edx, [PlayerX]
-    
+    mov     qword ptr [rsp+32], 40  ; 假設高 40
+    mov     r9d, 40                 ; 假設寬 40
+    mov     r8d, [PlayerY]          ; Y 座標
+    mov     edx, [PlayerX]          ; X 座標
     mov     rcx, rbx
     call    BitBlt
-    
+
+    mov     rcx, r13
+    call    DeleteDC
+
+DrawObs:
+    ; 4. 畫障礙物
+    cmp     [hBitmapObs], 0
+    je      EndPaintJob
+
+    ; 準備 DC
+    mov     rcx, rbx
+    call    CreateCompatibleDC
+    mov     r13, rax
+    mov     rcx, r13
+    mov     rdx, [hBitmapObs]
+    call    SelectObject
+
+    ; 迴圈畫出所有有效障礙物
+    mov     r15, 0
+    lea     r14, Obstacles
+
+ObsLoop:
+    cmp     [r14].GameObject.active, 1
+    jne     NextObsDraw
+
+    mov     qword ptr [rsp+64], SRCCOPY
+    mov     qword ptr [rsp+56], 0
+    mov     qword ptr [rsp+48], 0
+    mov     qword ptr [rsp+40], r13
+    mov     eax, [r14].GameObject.h
+    mov     [rsp+32], rax           ; Height
+    mov     r9d, [r14].GameObject.w ; Width
+    mov     r8d, [r14].GameObject.y ; Y
+    mov     edx, [r14].GameObject.x ; X
+    mov     rcx, rbx
+    call    BitBlt
+
+NextObsDraw:
+    add     r14, SIZEOF GameObject
+    inc     r15
+    cmp     r15, MAX_OBSTACLES
+    jl      ObsLoop
+
     mov     rcx, r13
     call    DeleteDC
 
@@ -374,12 +282,6 @@ EndPaintJob:
     jmp     FinishWndProc
 
 HandleDestroy:
-    cmp     [hBitmap], 0
-    je      DoQuit
-    mov     rcx, [hBitmap]
-    call    DeleteObject
-
-DoQuit:
     mov     rcx, 0
     call    PostQuitMessage
     mov     rax, 0
@@ -394,20 +296,28 @@ WndProc ENDP
 
 InitPictures PROC
     sub     rsp, 56
+    
+    ; 載入恐龍 (紅)
     mov     rcx, 0
-    lea     rdx, BitmapFileName
+    lea     rdx, DinoImg
     mov     r8, IMAGE_BITMAP
     mov     r9, 0
     mov     qword ptr [rsp+32], 0
     mov     qword ptr [rsp+40], 10h
     call    LoadImageW
-    mov     [hBitmap], rax
-    
-    ; 載入其他圖片 (略，保持不變)
-    ; ... (為了節省篇幅，此處邏輯與您原始檔案相同)
-    
+    mov     [hBitmapDino], rax
+
+    ; 載入障礙物 (藍)
+    mov     rcx, 0
+    lea     rdx, ObsImg
+    mov     r8, IMAGE_BITMAP
+    mov     r9, 0
+    mov     qword ptr [rsp+32], 0
+    mov     qword ptr [rsp+40], 10h
+    call    LoadImageW
+    mov     [hBitmapObs], rax
+
     add     rsp, 56
     ret
 InitPictures ENDP
-
 END

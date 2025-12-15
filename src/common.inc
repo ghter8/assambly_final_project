@@ -49,16 +49,25 @@ PAINTSTRUCT STRUCT
 PAINTSTRUCT ENDS
 
 ; ==========================================
-; 輸入模組宣告
-; 邏輯：如果 "不是" Input 模組在讀我，我就告訴他這些是 EXTERN
+; 遊戲物件結構 (用於障礙物)
 ; ==========================================
+GameObject STRUCT
+    active      DWORD   0   ; 0=無效, 1=有效
+    x           SDWORD  0   ; X 座標
+    y           SDWORD  0   ; Y 座標 (通常固定在地板)
+    w           DWORD   0   ; 寬度 (碰撞檢測用)
+    h           DWORD   0   ; 高度
+GameObject ENDS
+
+MAX_OBSTACLES   EQU 5       ; 同時存在的最大障礙物數量
+
 IFNDEF IS_INPUT_MODULE
     EXTERN UpdateInput: PROC
     EXTERN Key_Up:      BYTE
     EXTERN Key_Down:    BYTE
     EXTERN Key_Left:    BYTE
     EXTERN Key_Right:   BYTE
-    EXTERN Key_Z:       BYTE
+    EXTERN Key_Space:   BYTE ; [新增] 空白鍵
     EXTERN Key_Escape:  BYTE
 ENDIF
 
@@ -67,37 +76,10 @@ IFNDEF IS_WINDOW_MODULE
 ENDIF
 
 IFNDEF IS_GAME_MODULE
-    EXTERN Movement:    PROC
+    EXTERN UpdateGame:  PROC ; 改名為 UpdateGame 更貼切
     EXTERN PlayerX:     SDWORD
     EXTERN PlayerY:     SDWORD
-ENDIF
-
-; ==========================================
-; 5. 特效物件系統 (Object System)
-; ==========================================
-
-; 物件狀態常數
-OBJ_DEAD        EQU 0   ; 死亡 (可以被新的覆蓋)
-OBJ_FADE_IN     EQU 1   ; 淡入中
-OBJ_ACTIVE      EQU 2   ; 顯示中 (倒數計時)
-OBJ_FADE_OUT    EQU 3   ; 淡出中
-
-; 物件資料結構
-GameObject STRUCT
-    state       DWORD   0   ; 當前狀態
-    x           SDWORD  0   ; X 座標
-    y           SDWORD  0   ; Y 座標
-    dirX        SDWORD  0   ; X 速度
-    dirY        SDWORD  0   ; Y 速度
-    alpha       DWORD   0   ; 透明度 (0~255)
-    lifeTime    DWORD   0   ; 停留時間計數器
-GameObject ENDS
-
-; 最大同時存在物件數 (可自行調整)
-MAX_OBJECTS     EQU 100
-
-IFNDEF IS_GAME_MODULE
-    EXTERN ObjectPool: GameObject
-    EXTERN SpawnObject: PROC
-    EXTERN UpdateObjects: PROC
+    EXTERN GameState:   DWORD
+    EXTERN Score:       DWORD
+    EXTERN Obstacles:   GameObject
 ENDIF
