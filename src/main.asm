@@ -38,28 +38,33 @@ MsgLoop:
     cmp     eax, 0
     jle     ExitApp
 
-    ; ==========================================================
-    ; [核心修正] 固定時間步 (Fixed Time Step)
-    ; 只有當訊息是 WM_TIMER (0x0113) 時，才執行遊戲邏輯
-    ; 這樣可以避免滑鼠移動導致角色速度暴衝
-    ; ==========================================================
-    cmp     msg.message, 0113h  ; 檢查是否為 WM_TIMER
-    jne     SkipGameLogic       ; 如果不是 Timer，跳過邏輯，直接處理訊息
+    ; ... (檢查 Timer 訊息) ...
+    cmp     msg.message, 0113h
+    jne     SkipGameLogic
 
-    ; --- 遊戲邏輯區塊 (每 10ms 執行一次) ---
-    call    UpdateInput         ; 1. 更新按鍵狀態
+    call    UpdateInput
+    
+    ; 1. 玩家移動
+    call    Movement
 
-    ; 檢查離開
-    cmp     Key_Escape, 1
-    je      ExitApp
+    ; 2. [新增] 更新特效物件狀態
+    call    UpdateObjects
 
-    call    Movement            ; 2. 計算角色移動
-
-    ; 檢查 Z 鍵 (範例功能)
+    ; 3. [新增] 測試生成：按下 Z 鍵時產生特效
+    ; 我們在玩家當前位置生成一個物件，並讓它隨機或固定方向飄走
     cmp     Key_Z, 1
-    jne     SkipZ
-    mov     gaming, 1
-SkipZ:
+    jne     SkipSpawn
+    
+    ; 參數: X=PlayerX, Y=PlayerY, DirX=2, DirY=-2 (往右上方飛)
+    mov     ecx, [PlayerX]
+    mov     edx, [PlayerY]
+    mov     r8d, 2
+    mov     r9d, -2
+    call    SpawnObject
+    
+    ; (為了避免按住 Z 一次噴太多，您可以加一個冷卻機制，但暫時先這樣看效果)
+
+SkipSpawn:
     ; --------------------------------------
 
 SkipGameLogic:

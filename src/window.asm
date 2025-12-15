@@ -29,6 +29,7 @@ EXTERN BitBlt: PROC
 EXTERN DeleteDC: PROC
 EXTERN GetObjectW: PROC
 EXTERN MessageBoxW: PROC
+EXTERN AlphaBlend: PROC
 
 PUBLIC InitWindow
 PUBLIC WndProc
@@ -293,6 +294,57 @@ HandlePaint:
     mov     rdx, [hBitmap]
     call    SelectObject
 
+    ; ==========================================================
+    ; [渲染] 繪製所有特效物件
+    ; ==========================================================
+    ; 使用 R15 作為迴圈計數器, R14 作為指標
+    mov     r15, 0
+    lea     r14, ObjectPool     ; 取得陣列開頭
+
+DrawObjectLoop:
+    ; 檢查物件是否存活 (非 DEAD)
+    cmp     [r14].GameObject.state, OBJ_DEAD
+    je      NextDrawObj
+
+    ; ------------------------------------------------------
+    ; 準備 AlphaBlend 參數
+    ; ------------------------------------------------------
+    
+    ; 1. 計算 BLENDFUNCTION (0x00AA0000)
+    mov     eax, [r14].GameObject.alpha
+    shl     eax, 16
+    mov     [rsp+80], rax       ; Param 11: BLENDFUNCTION
+
+    ; 2. 來源參數 (堆疊)
+    mov     eax, [bmHeight]
+    mov     [rsp+72], rax       ; Param 10: SrcH
+    mov     eax, [bmWidth]
+    mov     [rsp+64], rax       ; Param 9: SrcW
+    mov     qword ptr [rsp+56], 0 ; Param 8: SrcY
+    mov     qword ptr [rsp+48], 0 ; Param 7: SrcX
+    mov     qword ptr [rsp+40], r13 ; Param 6: hdcSrc
+
+    ; 3. 目標參數 (堆疊 + 暫存器)
+    mov     eax, [bmHeight]
+    mov     [rsp+32], rax       ; Param 5: DestH
+
+    mov     r9d, [bmWidth]      ; Param 4: DestW
+    
+    ; [關鍵] 使用物件自己的座標
+    mov     r8d, [r14].GameObject.y ; Param 3: DestY
+    mov     edx, [r14].GameObject.x ; Param 2: DestX
+    
+    mov     rcx, rbx            ; Param 1: hdcDest
+
+    ; 呼叫 AlphaBlend
+    call    AlphaBlend
+
+NextDrawObj:
+    add     r14, SIZEOF GameObject
+    inc     r15
+    cmp     r15, MAX_OBJECTS
+    jl      DrawObjectLoop
+
     ; BitBlt
     mov     qword ptr [rsp+64], SRCCOPY
     mov     qword ptr [rsp+56], 0
@@ -310,7 +362,7 @@ HandlePaint:
     
     mov     rcx, rbx
     call    BitBlt
-
+    
     mov     rcx, r13
     call    DeleteDC
 
